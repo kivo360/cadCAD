@@ -1,3 +1,3 @@
-from cadCAD.configuration import Experiment
+from prima.configuration import Experiment
 
 exp = Experiment()

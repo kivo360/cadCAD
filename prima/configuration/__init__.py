@@ -5,16 +5,35 @@ from collections import deque
 from copy import deepcopy
 import pandas as pd
 
-from cadCAD.utils import key_filter
-from cadCAD.configuration.utils import exo_update_per_ts, configs_as_objs
-from cadCAD.configuration.utils.depreciationHandler import sanitize_partial_state_updates, sanitize_config
+from prima.utils import key_filter
+from prima.configuration.utils import exo_update_per_ts, configs_as_objs
+from prima.configuration.utils.depreciationHandler import (
+    sanitize_partial_state_updates,
+    sanitize_config,
+)
 
 
-class Configuration():
-    def __init__(self, user_id, model_id, subset_id, subset_window, sim_config={}, initial_state={}, seeds={}, env_processes={},
-                 exogenous_states={}, partial_state_update_blocks={}, policy_ops=[lambda a, b: a + b],
-                 session_id=0, simulation_id=0, run_id=1, experiment_id=0, exp_window=deque([0, None], 2),
-                 exp_creation_ts=None, **kwargs
+class Configuration:
+    def __init__(
+        self,
+        user_id,
+        model_id,
+        subset_id,
+        subset_window,
+        sim_config={},
+        initial_state={},
+        seeds={},
+        env_processes={},
+        exogenous_states={},
+        partial_state_update_blocks={},
+        policy_ops=[lambda a, b: a + b],
+        session_id=0,
+        simulation_id=0,
+        run_id=1,
+        experiment_id=0,
+        exp_window=deque([0, None], 2),
+        exp_creation_ts=None,
+        **kwargs,
     ) -> None:
         self.sim_config = sim_config
         self.initial_state = initial_state
@@ -60,21 +79,28 @@ class Experiment(object):
         self.subset_window = deque([self.subset_id, None], 2)
 
     def append_model(
-            self,
-            user_id='cadCAD_user',
-            model_id=None,
-            sim_configs={}, initial_state={}, seeds={}, raw_exogenous_states={}, env_processes={},
-            partial_state_update_blocks={}, policy_ops=[lambda a, b: a + b], _exo_update_per_ts: bool = True, **kwargs
-            # config_list=deepcopy(global_configs)
+        self,
+        user_id="prima_user",
+        model_id=None,
+        sim_configs={},
+        initial_state={},
+        seeds={},
+        raw_exogenous_states={},
+        env_processes={},
+        partial_state_update_blocks={},
+        policy_ops=[lambda a, b: a + b],
+        _exo_update_per_ts: bool = True,
+        **kwargs
+        # config_list=deepcopy(global_configs)
     ) -> None:
         _sim_configs = deepcopy(sim_configs)
         # self.configs = config_list
         self.simulation_id += 1
 
         try:
-            max_runs = _sim_configs[0]['N']
+            max_runs = _sim_configs[0]["N"]
         except KeyError:
-            max_runs = _sim_configs['N']
+            max_runs = _sim_configs["N"]
 
         if _exo_update_per_ts is True:
             exogenous_states = exo_update_per_ts(raw_exogenous_states)
@@ -86,21 +112,23 @@ class Experiment(object):
 
         sim_cnt_local = 0
         new_sim_configs = []
-        for subset_id, t in enumerate(list(zip(_sim_configs, list(range(len(_sim_configs)))))):
+        for subset_id, t in enumerate(
+            list(zip(_sim_configs, list(range(len(_sim_configs)))))
+        ):
             sim_config = t[0]
-            sim_config['subset_id'] = subset_id
-            sim_config['subset_window'] = self.subset_window
-            N = sim_config['N']
+            sim_config["subset_id"] = subset_id
+            sim_config["subset_window"] = self.subset_window
+            N = sim_config["N"]
             if N > 1:
                 for n in range(N):
-                    sim_config['simulation_id'] = self.simulation_id
-                    sim_config['run_id'] = n
-                    sim_config['N'] = 1
+                    sim_config["simulation_id"] = self.simulation_id
+                    sim_config["run_id"] = n
+                    sim_config["N"] = 1
                     new_sim_configs.append(deepcopy(sim_config))
                 del sim_config
             else:
-                sim_config['simulation_id'] = self.simulation_id
-                sim_config['run_id'] = 0
+                sim_config["simulation_id"] = self.simulation_id
+                sim_config["run_id"] = 0
                 new_sim_configs.append(deepcopy(sim_config))
 
             sim_cnt_local += 1
@@ -120,18 +148,17 @@ class Experiment(object):
         run_id = 0
         new_model_ids, new_configs = [], []
         for sim_config in new_sim_configs:
-            subset_id = sim_config['subset_id']
-            sim_config['N'] = run_id + 1
+            subset_id = sim_config["subset_id"]
+            sim_config["N"] = run_id + 1
             if max_runs == 1:
-                sim_config['run_id'] = run_id
+                sim_config["run_id"] = run_id
             elif max_runs >= 1:
                 if run_id >= max_runs:
-                    sim_config['N'] = run_id - (max_runs - 1)
+                    sim_config["N"] = run_id - (max_runs - 1)
 
             self.exp_window = deepcopy(self.exp_window)
             config = Configuration(
                 exp_creation_ts=self.exp_creation_ts,
-
                 sim_config=sim_config,
                 initial_state=initial_state,
                 seeds=seeds,
@@ -139,19 +166,16 @@ class Experiment(object):
                 env_processes=env_processes,
                 partial_state_update_blocks=partial_state_update_blocks,
                 policy_ops=policy_ops,
-
                 # session_id=session_id,
                 user_id=user_id,
                 model_id=model_id,
                 session_id=f"{user_id}={sim_config['simulation_id']}_{sim_config['run_id']}",
-
                 experiment_id=self.exp_id,
                 simulation_id=self.simulation_id,
                 subset_id=subset_id,
-                run_id=sim_config['run_id'],
-
+                run_id=sim_config["run_id"],
                 exp_window=self.exp_window,
-                subset_window=self.subset_window
+                subset_window=self.subset_window,
             )
 
             # self.configs.append(config)
@@ -180,13 +204,15 @@ class Experiment(object):
         for model_id, job in list(zip(new_model_ids, new_configs)):
             self.model_job_map[model_id].append(job)
 
-        self.model_job_counts = dict([(k, len(v)) for k, v in self.model_job_map.items()])
+        self.model_job_counts = dict(
+            [(k, len(v)) for k, v in self.model_job_map.items()]
+        )
 
     append_configs = append_model
 
 
 class Identity:
-    def __init__(self, policy_id: Dict[str, int] = {'identity': 0}) -> None:
+    def __init__(self, policy_id: Dict[str, int] = {"identity": 0}) -> None:
         self.beh_id_return_val = policy_id
 
     def p_identity(self, var_dict, sub_step, sL, s, **kwargs):
@@ -203,10 +229,9 @@ class Identity:
 
     # state_identity = cloudpickle.dumps(state_identity)
 
-    def apply_identity_funcs(self,
-                             identity: Callable,
-                             df: DataFrame,
-                             cols: List[str]) -> DataFrame:
+    def apply_identity_funcs(
+        self, identity: Callable, df: DataFrame, cols: List[str]
+    ) -> DataFrame:
         """
         Apply the identity on each df column, using its self value as the
         argument.
@@ -226,9 +251,9 @@ class Processor:
         self.apply_identity_funcs = id.apply_identity_funcs
 
     def create_matrix_field(self, partial_state_updates, key: str) -> DataFrame:
-        if key == 'variables':
+        if key == "variables":
             identity = self.state_identity
-        elif key == 'policies':
+        elif key == "policies":
             identity = self.policy_identity
 
         df = pd.DataFrame(key_filter(partial_state_updates, key))
@@ -236,19 +261,25 @@ class Processor:
         if len(filled_df) > 0:
             return filled_df
         else:
-            return pd.DataFrame({'empty': []})
+            return pd.DataFrame({"empty": []})
 
-    def generate_config(self, initial_state, partial_state_updates, exo_proc
-                       ) -> List[Tuple[List[Callable], List[Callable]]]:
-
+    def generate_config(
+        self, initial_state, partial_state_updates, exo_proc
+    ) -> List[Tuple[List[Callable], List[Callable]]]:
         def no_update_handler(bdf, sdf):
             if (bdf.empty == False) and (sdf.empty == True):
                 bdf_values = bdf.values.tolist()
-                sdf_values = [[self.no_state_identity] * len(bdf_values) for m in range(len(partial_state_updates))]
+                sdf_values = [
+                    [self.no_state_identity] * len(bdf_values)
+                    for m in range(len(partial_state_updates))
+                ]
                 return sdf_values, bdf_values
             elif (bdf.empty == True) and (sdf.empty == False):
                 sdf_values = sdf.values.tolist()
-                bdf_values = [[self.p_identity] * len(sdf_values) for m in range(len(partial_state_updates))]
+                bdf_values = [
+                    [self.p_identity] * len(sdf_values)
+                    for m in range(len(partial_state_updates))
+                ]
                 return sdf_values, bdf_values
             else:
                 sdf_values = sdf.values.tolist()
@@ -257,7 +288,8 @@ class Processor:
 
         def only_ep_handler(state_dict):
             sdf_functions = [
-                lambda var_dict, sub_step, sL, s, _input, **kwargs: (k, v) for k, v in zip(state_dict.keys(), state_dict.values())
+                lambda var_dict, sub_step, sL, s, _input, **kwargs: (k, v)
+                for k, v in zip(state_dict.keys(), state_dict.values())
             ]
             sdf_values = [sdf_functions]
             bdf_values = [[self.p_identity] * len(sdf_values)]
@@ -265,10 +297,12 @@ class Processor:
 
         if len(partial_state_updates) != 0:
             # backwards compatibility
-            partial_state_updates = sanitize_partial_state_updates(partial_state_updates)
+            partial_state_updates = sanitize_partial_state_updates(
+                partial_state_updates
+            )
 
-            bdf = self.create_matrix_field(partial_state_updates, 'policies')
-            sdf = self.create_matrix_field(partial_state_updates, 'variables')
+            bdf = self.create_matrix_field(partial_state_updates, "policies")
+            sdf = self.create_matrix_field(partial_state_updates, "variables")
             sdf_values, bdf_values = no_update_handler(bdf, sdf)
             zipped_list = list(zip(sdf_values, bdf_values))
         else:

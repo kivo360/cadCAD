@@ -1,4 +1,7 @@
+# %%
 import numpy as np
+import pandas as pd
+import tabulate
 from datetime import timedelta
 
 from prima.configuration.utils import (
@@ -8,8 +11,9 @@ from prima.configuration.utils import (
     env_trigger,
 )
 from prima.configuration import Experiment
-from documentation.examples import system_model_AB_exp
 
+
+# %%
 seeds = {
     "z": np.random.RandomState(1),
     "a": np.random.RandomState(2),
@@ -17,7 +21,7 @@ seeds = {
     "c": np.random.RandomState(4),
 }
 
-
+# %%
 # Policies per Mechanism
 def p1m1(_g, step, sH, s):
     return {"param1": 1}
@@ -43,7 +47,45 @@ def p2m3(_g, step, sH, s):
     return {"param1": ["d"], "param2": np.array([20, 200])}
 
 
+# %%
+import sys
+
+from decorator import decorator, decorate
+
+# from loguru import logger
+# from logging import StreamHandler
+
+
+# logger.configure(
+#     handlers=[
+#         dict(
+#             sink=sys.stderr,
+#             format="[green]{time:YYYY-MM-DD at HH:mm:ss}[green] | [cyan]{level}[cyan] | {message}",
+#             enqueue=True,
+#             serialize=True,
+#         ),
+#     ],
+# )
+
+
+# %%
+
+
+# %%
+def _print_param(func, *args, **kwargs):
+    print(kwargs)
+    return func(*args, **kwargs)
+
+@decorator
+def print_parameters(func, *args, **kwargs):
+    # logger.info("Parameters: {}".format(kw))
+    return func(*args, **kwargs)
+
+
+# %%
+
 # Internal States per Mechanism
+@print_parameters
 def s1m1(_g, step, sH, s, _input):
     y = "s1"
     x = s["s1"] + 1
@@ -77,6 +119,7 @@ def s1m3(_g, step, sH, s, _input):
 def s2m3(_g, step, sH, s, _input):
     y = "s2"
     x = _input["param2"]
+
     return (y, x)
 
 
@@ -84,6 +127,9 @@ def policies(_g, step, sH, s, _input):
     y = "policies"
     x = _input
     return (y, x)
+
+
+# %%
 
 
 # Exogenous States
@@ -99,6 +145,7 @@ def es3(_g, step, sH, s, _input):
 
 def es4(_g, step, sH, s, _input):
     y = "s4"
+    y = "s4"
     x = s["s4"] * bound_norm_random(seeds["b"], proc_one_coef_A, proc_one_coef_B)
     return (y, x)
 
@@ -110,6 +157,9 @@ def update_timestamp(_g, step, sH, s, _input):
         dt_format="%Y-%m-%d %H:%M:%S",
         _timedelta=timedelta(days=0, minutes=0, seconds=1),
     )
+
+
+# %%
 
 
 # Genesis States
@@ -138,7 +188,9 @@ env_processes = {
 }
 
 
-psubs = [
+# %%
+
+partial_states = [
     {
         "policies": {"b1": p1m1, "b2": p2m1},
         "variables": {
@@ -183,15 +235,35 @@ exp.append_model(
     sim_configs=sim_config,
     initial_state=genesis_states,
     env_processes=env_processes,
-    partial_state_update_blocks=psubs,
+    partial_state_update_blocks=partial_states,
     policy_ops=[lambda a, b: a + b],
 )
 
-system_model_AB_exp.append_model(
-    model_id="sys_model_A",
-    sim_configs=sim_config,
-    initial_state=genesis_states,
-    env_processes=env_processes,
-    partial_state_update_blocks=psubs,
-    policy_ops=[lambda a, b: a + b],
-)
+# %%
+from prima.engine import ExecutionMode, ExecutionContext
+
+exec_mode = ExecutionMode()
+local_mode_ctx = ExecutionContext(context=exec_mode.single_mode)
+
+
+# %%
+from prima.engine import Executor
+
+simulation = Executor(exec_context=local_mode_ctx, configs=exp.configs)
+
+# %%
+raw_system_events, tensor_field, sessions = simulation.execute()
+
+# %%
+
+
+# %%
+
+
+# %%
+simulation_result = pd.DataFrame(raw_system_events)
+
+# %%
+print(tabulate.tabulate(simulation_result, tablefmt="fancy_grid"))
+
+# %%
