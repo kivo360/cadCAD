@@ -1,7 +1,8 @@
 import pandas as pd
 from tabulate import tabulate
+
 # The following imports NEED to be in the exact order
-from cadCAD.engine import ExecutionMode, ExecutionContext, Executor
+from prima.engine import ExecutionMode, ExecutionContext, Executor
 from documentation.examples import sys_model_B
 from documentation.examples.sys_model_B import exp
 
@@ -16,7 +17,7 @@ raw_result, tensor_field, sessions = run.execute()
 result = pd.DataFrame(raw_result)
 print()
 print("Tensor Field: sys_model_B")
-print(tabulate(tensor_field, headers='keys', tablefmt='psql'))
+print(tabulate(tensor_field, headers="keys", tablefmt="psql"))
 print("Output:")
-print(tabulate(result, headers='keys', tablefmt='psql'))
+print(tabulate(result, headers="keys", tablefmt="psql"))
 print()

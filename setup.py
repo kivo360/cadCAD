@@ -1,10 +1,10 @@
 from setuptools import setup, find_packages
 
-short_description = "cadCAD: a differential games based simulation software package for research, validation, and \
+short_description = "prima: a differential games based simulation software package for research, validation, and \
         Computer Aided Design of economic systems"
 
 long_description = """
-cadCAD (complex adaptive systems computer-aided design) is a python based, unified modeling framework for stochastic 
+prima (complex adaptive systems computer-aided design) is a python based, unified modeling framework for stochastic 
 dynamical systems and differential games for research, validation, and Computer Aided Design of economic systems created 
 by BlockScience. It is capable of modeling systems at all levels of abstraction from Agent Based Modeling (ABM) to 
 System Dynamics (SD), and enabling smooth integration of computational social science simulations with empirical data 
@@ -20,14 +20,14 @@ under various conditions. Support for A/B testing policies, Monte Carlo analysis
 provided.
 """
 
-name = "cadCAD"
+name = "prima"
 version = "0.4.28"
 
 setup(name=name,
       version=version,
       description=short_description,
       long_description=long_description,
-      url='https://github.com/cadCAD-org/cadCAD',
+      url='https://github.com/prima-org/prima',
       author='Joshua E. Jodesty',
       author_email='joshua@block.science',
       license='LICENSE.txt',

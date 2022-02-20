@@ -1,5 +1,5 @@
 from funcy import curry
-from cadCAD.configuration.utils import ep_time_step, time_step
+from prima.configuration.utils import ep_time_step, time_step
 
 
 def increment(y, incr_by):
@@ -21,7 +21,7 @@ def simple_policy_update(y):
 def update_timestamp(y, timedelta, format):
     return lambda _g, step, sL, s, _input, **kwargs: (
         y,
-        ep_time_step(s, dt_str=s[y], fromat_str=format, _timedelta=timedelta)
+        ep_time_step(s, dt_str=s[y], fromat_str=format, _timedelta=timedelta),
     )
 
 
@@ -41,10 +41,11 @@ def s(y, x):
     return lambda _g, step, sH, s, _input, **kwargs: (y, x)
 
 
-def time_model(y, substeps, time_delta, ts_format='%Y-%m-%d %H:%M:%S'):
+def time_model(y, substeps, time_delta, ts_format="%Y-%m-%d %H:%M:%S"):
     def apply_incriment_condition(s):
-        if s['substep'] == 0 or s['substep'] == substeps:
+        if s["substep"] == 0 or s["substep"] == substeps:
             return y, time_step(dt_str=s[y], dt_format=ts_format, _timedelta=time_delta)
         else:
             return y, s[y]
+
     return lambda _g, step, sL, s, _input, **kwargs: apply_incriment_condition(s)
