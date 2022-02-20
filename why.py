@@ -76,6 +76,7 @@ def _print_param(func, *args, **kwargs):
     print(kwargs)
     return func(*args, **kwargs)
 
+
 @decorator
 def print_parameters(func, *args, **kwargs):
     # logger.info("Parameters: {}".format(kw))
@@ -254,16 +255,7 @@ simulation = Executor(exec_context=local_mode_ctx, configs=exp.configs)
 # %%
 raw_system_events, tensor_field, sessions = simulation.execute()
 
-# %%
-
-
-# %%
-
-
-# %%
 simulation_result = pd.DataFrame(raw_system_events)
 
 # %%
 print(tabulate.tabulate(simulation_result, tablefmt="fancy_grid"))
-
-# %%
