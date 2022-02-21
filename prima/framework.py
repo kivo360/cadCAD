@@ -1,42 +1,11 @@
-import abc
-from ast import alias
-import inspect
-from pydantic import BaseModel, Field, parse_obj_as, Extra
-from pydantic.generics import GenericModel
-from typing import (
-    Callable,
-    Any,
-    Literal,
-    TypeVar,
-    Generic,
-    Type,
-    Union,
-    List,
-    Dict,
-    Tuple,
-    Optional,
-    TYPE_CHECKING,
-    ClassVar,
-)
-from types import FunctionType
-from inflection import parameterize, dasherize
-from decorator import decorator
-from loguru import logger
-from typing import TypeVar, Generic
-from enum import Enum
-from pathlib import Path
-from toolz.curried import curry
-
-ROOT = Path(__file__).parent
+from ._imports import *
 
 
-CallAny = Callable[..., Any]
-OptCany = Optional[CallAny]
-TupleAny = Tuple[str, Any]
-StateSP = TypeVar("StateSP")
-SysParams = TypeVar("SysParams")
-PolicySP = TypeVar("PolicySP")
-DictAny = Dict[str, Any]
+def filter_poly_val(item: Tuple[str, Any]) -> bool:
+    key, value = item
+    if key in ["policies", "variables"] and isinstance(value, dict):
+        return True
+    return False
 
 
 class FoundationBase(BaseModel, abc.ABC):
@@ -58,10 +27,8 @@ def create_decorator(
 ) -> Callable[..., Tuple[str, Any]]:
     @decorator
     def inner_decorator(func, *args, **kwargs):
-
-        args, kwargs = (
-            pre(*args, fn=func, **kwargs) if pre is not None else (args, kwargs)
-        )
+        logger.info("Decorating {}".format(func.__name__))
+        args, kwargs = pre(*args, **kwargs) if pre is not None else (args, kwargs)
 
         response = func(*args, **kwargs)
         response = post(response, fn=func) if post is not None else response
@@ -72,6 +39,25 @@ def create_decorator(
     return inner
 
 
+class ParitalState(BaseModel):
+    policies: DictAny = {}
+    variables: DictAny = {}
+
+    def add_policies(self, policies: DictAny) -> None:
+        self.policies.update(policies)
+
+    def add_variables(self, variables: DictAny) -> None:
+        self.variables.update(variables)
+
+    # Set attribute like a dict
+    def __add__(self, other: dict):
+        if isinstance(other, dict) and other.keys() in {"policies", "variables"}:
+            self.policies.update(other.get("policies", {}))
+            self.variables.update(other.get("variables", {}))
+            return self
+        return super().__add__(other)
+
+
 class Foundation(GenericModel, FoundationBase, Generic[StateSP, SysParams, PolicySP]):
     if TYPE_CHECKING:
         __genisis__: ClassVar[DictAny] = {}
@@ -80,19 +66,27 @@ class Foundation(GenericModel, FoundationBase, Generic[StateSP, SysParams, Polic
         # Environment processes
         __processes__: ClassVar[DictAny] = {}
         __partial_blocks__: ClassVar[DictAny] = {}
+
     model_id: str = "foundation"
     state_space: StateSP
     system_params: SysParams
     policy_space: PolicySP
 
+    partial_states: List[ParitalState] = []
+
+    @root_validator
+    def extract_initial_states(cls, values: DictAny) -> DictAny:
+        # cls.__genisis__ = values.get("state_space", {})
+        return values
+
     def input_preprocess(self, *args, **kwargs) -> Tuple[List, DictAny]:
         if not len(args) >= 5:
             return args, kwargs
-
+        logger.info(args[2])
         space_type = type(self.state_space)
         args = list(args)
         args[0] = self.system_params
-        args[2] = parse_obj_as(List[space_type], args[2])
+        # args[2] = parse_obj_as(List[space_type], args[2][0])
         args[3] = space_type(**args[3])
         return args, kwargs
 
@@ -118,6 +112,7 @@ class Foundation(GenericModel, FoundationBase, Generic[StateSP, SysParams, Polic
     def policy(self, policy: str, fn_name: str, **kwargs) -> None:
         def pre_process(*args, **kwargs) -> Tuple[List, DictAny]:
             args, kwargs = self.input_preprocess(*args, **kwargs)
+            # args[4] = type(self.state_space)(**args[4])
             return tuple(args), kwargs
 
         def post_process(response: Any, *args, **kwargs) -> Tuple[str, Any]:
@@ -140,16 +135,53 @@ class Foundation(GenericModel, FoundationBase, Generic[StateSP, SysParams, Polic
     def leave_context(self):
         pass
 
+    @property
+    def state_dict(self):
+        return self.state_space.dict(exclude_none=True)
 
-class UpdateRules(BaseModel):
-    policies: DictAny
-    variables: DictAny
+    @property
+    def config(self):
+        return self.system_params.dict(exclude_none=True, by_alias=True)
 
-    def add_policies(self, policies: DictAny) -> None:
-        self.policies.update(policies)
+    @property
+    def simulation_config(self):
+        return config_sim(self.config)
 
-    def add_variables(self, variables: DictAny) -> None:
-        self.variables.update(variables)
+    @property
+    def partials(self):
+        return [part.dict() for part in self.partial_states]
+
+    @property
+    def processes(self):
+        """The processes property."""
+        # Using placeholder to get something working.
+        trigger_timestamps = [
+            "2018-10-01 15:16:25",
+            "2018-10-01 15:16:27",
+            "2018-10-01 15:16:29",
+        ]
+
+        return {
+            "s3": [lambda _g, x: 5],
+            "s4": env_trigger(3)(
+                trigger_field="timestamp",
+                trigger_vals=trigger_timestamps,
+                funct_list=[lambda _g, x: 10],
+            ),
+        }
+
+    def add_partial(self, part_state: ParitalState):
+        self.partial_states.append(part_state)
+
+    def get_model(self):
+        return dict(
+            model_id=self.model_id,
+            sim_configs=self.config,
+            initial_state=self.state_dict,
+            env_processes=self.processes,
+            partial_state_update_blocks=self.partials,
+            policy_ops=[lambda a, b: a + b],
+        )
 
 
 def create_foundation(
@@ -192,6 +224,7 @@ class PolicyVarSpace(BaseModel):
 foundation = create_foundation(GenesisState(), SystemParams(), PolicyVarSpace())
 
 
+# NOTE: Making sure this function can have parameters. Append func to an internal class that handles registry.
 @foundation.transition("bonding", "example_state_change")
 def example_state_change(
     params: ModelParams,
@@ -203,7 +236,3 @@ def example_state_change(
 ) -> Tuple[str, Any]:
 
     return statespace.hello
-
-
-response = example_state_change({}, 0, [], {}, {})
-logger.warning(response)

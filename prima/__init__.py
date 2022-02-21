@@ -19,5 +19,6 @@ by prima
 """
 
 
-def init():
-    pass
+from .framework import create_foundation, ParitalState
+
+init = create_foundation
